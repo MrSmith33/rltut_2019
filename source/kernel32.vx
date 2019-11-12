@@ -1,0 +1,19 @@
+void ExitProcess(u32 uExitCode);
+u64 GetTickCount64();
+bool QueryPerformanceCounter(i64* performanceCount);
+
+u8 WriteConsoleA(
+	void* hConsoleOutput,
+	u8* lpBuffer,
+	u32 nNumberOfCharsToWrite,
+	u32* lpNumberOfCharsWritten,
+	void* lpReserved
+);
+
+void* GetStdHandle(u32 nStdHandle);
+
+enum : u32 {
+	STD_INPUT_HANDLE  = 0xFFFFFFF6,
+	STD_OUTPUT_HANDLE = 0xFFFFFFF5,
+	STD_ERROR_HANDLE  = 0xFFFFFFF4
+}
