@@ -401,8 +401,8 @@ i32 main(void* hInstance, void* hPrevInstance, u8* lpCmdLine, i32 nShowCmd)
 	init_rand_state(&rand_state);
 
 	Window win;
-	i32 SCREEN_WIDTH = 1600;
-	i32 SCREEN_HEIGHT = 1000;
+	i32 SCREEN_WIDTH = 800;
+	i32 SCREEN_HEIGHT = 600;
 
 	window_init(&win, SCREEN_WIDTH, SCREEN_HEIGHT, "RL tutorial in Vox lang");
 

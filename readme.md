@@ -6,3 +6,9 @@ Compile with `tjc source/main.vx source/kernel32.vx source/sdl.vx source/sdlimag
 produces `main.exe` for win64
 
 Requires `SDL2.dll` and `SDL2_image.dll` libraries for compilation and start.
+
+Controls:
+* `WASD` - move
+* `LMB` / `RMB` - place / remove wall
+* `[` / `]` - change view radius
+* `Esc` - close
