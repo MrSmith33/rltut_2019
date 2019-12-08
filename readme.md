@@ -2,6 +2,8 @@
 
 [Vox compiler](https://github.com/MrSmith33/tiny_jit)
 
+[Latest release](/releases/latest)
+
 Compile with `tjc source/main.vx source/kernel32.vx source/sdl.vx source/sdlimage.vx source/utils.vx SDL2.dll SDL2_image.dll C:\Windows\System32\kernel32.dll`
 produces `main.exe` for win64
 

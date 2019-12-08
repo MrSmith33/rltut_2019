@@ -1,0 +1,61 @@
+import sdl;
+import sdlimage;
+import utils;
+
+struct Window
+{
+	SDL_Window* sdl_window;
+	SDL_Renderer* sdl_renderer;
+	SDL_Texture* font;
+}
+
+i32 window_init(Window* w, i32 width, i32 height, u8[] window_title)
+{
+	SDL_SetMainReady;
+
+	if(SDL_Init(SDL_INIT_VIDEO) != 0) {
+		println("Failed to init SDL");
+		return 1;
+	}
+
+	w.sdl_window = SDL_CreateWindow(window_title.ptr,
+		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_SHOWN);
+
+	if (w.sdl_window == null) {
+		println("Failed to create window");
+		return 2;
+	}
+
+	w.sdl_renderer = SDL_CreateRenderer(w.sdl_window, -1, SDL_RENDERER_ACCELERATED);
+	if (w.sdl_renderer == null) {
+		print("Failed to create renderer");
+		return 3;
+	}
+
+	SDL_SetRenderDrawColor(w.sdl_renderer, 0, 0, 0, 0);
+
+	i32 flags = IMG_INIT_PNG;
+	i32 initted = IMG_Init(flags);
+	if((initted & flags) != flags) {
+		return 4;
+	}
+
+	SDL_Surface* temp_surf = IMG_Load("arial10x10.png");
+	if (temp_surf == null) return 5;
+
+	w.font = SDL_CreateTextureFromSurface(w.sdl_renderer, temp_surf);
+	if (w.font == null) return 6;
+
+	SDL_FreeSurface(temp_surf);
+
+	return 0;
+}
+
+void window_destroy(Window* w)
+{
+	SDL_DestroyTexture(w.font);
+	SDL_DestroyRenderer(w.sdl_renderer);
+	SDL_DestroyWindow(w.sdl_window);
+	IMG_Quit;
+	SDL_Quit;
+}

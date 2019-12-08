@@ -1,0 +1,37 @@
+import utils;
+
+enum EntityFlags : u8 {
+	blocks    = 1 << 0,
+}
+
+struct Entity
+{
+	i32 x;
+	i32 y;
+	u8 flags;
+	u8 char;
+	u8 r;
+	u8 g;
+	u8 b;
+	u8[] name;
+
+	void move(i32 dx, i32 dy) {
+		print("Move ");
+		printInt(x);
+		print(" ");
+		printInt(y);
+		x += dx;
+		y += dy;
+		print(" -> ");
+		printInt(x);
+		print(" ");
+		printInt(y);
+		print(" ");
+		print(name);
+		println(null);
+	}
+
+	bool blocks() { return flags & EntityFlags.blocks; }
+}
+
+alias EntityId = u16;

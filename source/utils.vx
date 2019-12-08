@@ -138,6 +138,33 @@ i64 uniform(i64 a, i64 b, u64[2]* state) // inclusive interval []
 	return a + interval_pos;
 }
 
+struct Rect
+{
+	i32 x1;
+	i32 y1;
+	i32 x2;
+	i32 y2;
+
+	// TODO: return Point when compiler will support returning small structs
+	void center(Point* p)
+	{
+		p.x =  (x1 + x2) / 2;
+		p.y =  (y1 + y2) / 2;
+	}
+}
+
+struct Point
+{
+	i32 x;
+	i32 y;
+}
+
+bool intersect(Rect a, Rect b)
+{
+	return a.x1 <= b.x2 && a.x2 >= b.x1 &&
+		a.y1 <= b.y2 && a.y2 >= b.y1;
+}
+
 // Line visiting algorithm
 // Calls callback for all cells between starting and ending position (inclusive)
 // Passes userData as first arg of callback
