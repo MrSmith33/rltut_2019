@@ -1,6 +1,6 @@
 # Roguelike tutorial 2019 made with Vox programming language
 
-[Latest release](/releases/latest)
+[Latest release](https://github.com/MrSmith33/rltut_2019/releases/latest)
 
 [Roguelike Tutorial Revised - TCOD Version](http://rogueliketutorials.com/tutorials/tcod)
 
@@ -12,7 +12,7 @@ Produces `main.exe` for win64.
 
 Or compile and run with `run.cmd`
 
-Requires `SDL2.dll` and `SDL2_image.dll` libraries for compilation and start (Provided in releases).
+Requires `SDL2.dll` and `SDL2_image.dll` libraries for compilation and start (included in releases).
 
 Controls:
 * `WASD` - move
