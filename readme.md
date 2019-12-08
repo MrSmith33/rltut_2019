@@ -1,13 +1,18 @@
 # Roguelike tutorial 2019 made with Vox programming language
 
-[Vox compiler](https://github.com/MrSmith33/tiny_jit)
-
 [Latest release](/releases/latest)
 
-Compile with `tjc source/main.vx source/kernel32.vx source/sdl.vx source/sdlimage.vx source/utils.vx SDL2.dll SDL2_image.dll C:\Windows\System32\kernel32.dll`
-produces `main.exe` for win64
+[Roguelike Tutorial Revised - TCOD Version](http://rogueliketutorials.com/tutorials/tcod)
 
-Requires `SDL2.dll` and `SDL2_image.dll` libraries for compilation and start.
+[Vox compiler](https://github.com/MrSmith33/tiny_jit) (included in releases)
+
+Compile with `build.cmd` script.
+
+Produces `main.exe` for win64.
+
+Or compile and run with `run.cmd`
+
+Requires `SDL2.dll` and `SDL2_image.dll` libraries for compilation and start (Provided in releases).
 
 Controls:
 * `WASD` - move
