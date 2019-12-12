@@ -10,6 +10,11 @@ i32 max(i32 a, i32 b) {
 	return b;
 }
 
+i32 abs(i32 a) {
+	if (a < 0) return -a;
+	return a;
+}
+
 void print(u8[] str) {
 	void* handle = GetStdHandle(STD_OUTPUT_HANDLE);
 	u32 numWritten;
@@ -21,29 +26,27 @@ void print(u8[] str) {
 		null);
 }
 
-void setRangeu8(u8* slice, i64 from, i64 to, u8 value) {
-	while(from < to) {
-		slice[from] = value;
-		++from;
+void setRangeu8(u8[] slice, u8 value) {
+	for (u64 i = 0; i < slice.length; ++i) {
+		slice[i] = value;
 	}
 }
 
 void printInt(i64 i)
 {
 	u8[21] buf;
-	u8[] res;
-	formatInt(i, &buf, 1, &res);
+	u8[] res = formatInt(i, &buf, 1);
 	print(res);
 }
 
-void formatInt(i64 i, u8[21]* output, u32 minSize, u8[]* result)
+u8[] formatInt(i64 i, u8[21]* output, u32 minSize)
 {
 	u32 numDigits = 0;
 	if (i == 0)
 	{
 		if (minSize == 0)
 			minSize = 1;
-		setRangeu8((*output).ptr, 21 - minSize, 21, '0');
+		setRangeu8((*output)[21 - minSize..21], ' ');
 		(*output)[20] = '0';
 		numDigits = minSize;
 	}
@@ -65,7 +68,7 @@ void formatInt(i64 i, u8[21]* output, u32 minSize, u8[]* result)
 		}
 
 		while (numDigits < minSize) {
-			(*output)[21 - ++numDigits] = '0';
+			(*output)[21 - ++numDigits] = ' ';
 		}
 
 		if (neg) {
@@ -75,22 +78,13 @@ void formatInt(i64 i, u8[21]* output, u32 minSize, u8[]* result)
 			++(*output)[20];
 		}
 	}
-	//u8[] result;
-	(*result).ptr = (*output).ptr + (21 - numDigits);
-	(*result).length = numDigits;
-	//return result;
-	//result = (*output)[$-numDigits..$]
+	return (*output)[21 - numDigits..21];
 }
 
 void println(u8[] str) {
 	print(str);
-	u8[2] endl;
-	endl[0] = '\n';
-	endl[1] = '\0';
-	u8[] slice;
-	slice.ptr = cast(u8*)&endl;
-	slice.length = 1;
-	print(endl);
+	u8 endl = '\n';
+	print((&endl)[0..1]);
 }
 
 i64 cstrlen(u8* str) {
@@ -165,15 +159,25 @@ bool intersect(Rect a, Rect b)
 		a.y1 <= b.y2 && a.y2 >= b.y1;
 }
 
+enum LineVisitFlags : u32 {
+	SKIP_START = 1,
+	SKIP_END = 2,
+}
+
 // Line visiting algorithm
 // Calls callback for all cells between starting and ending position (inclusive)
 // Passes userData as first arg of callback
-void tran_thong(i32 xstart, i32 ystart, i32 xend, i32 yend, bool function(void*, i32, i32) callback, void* userData)
+// Stops traversal if callback returns true
+// flags is set of LineVisitFlags
+//   - SKIP_START disables visit on first tile
+//   - SKIP_END   disables visit on last tile
+void tran_thong(i32 xstart, i32 ystart, i32 xend, i32 yend, bool function(void*, i32, i32) callback, void* userData, u32 flags)
 {
 	i32 x = xstart;
 	i32 y = ystart;
 
-	if (callback(userData, x, y)) return;
+	if (!(flags & LineVisitFlags.SKIP_START))
+		if (callback(userData, x, y)) return;
 
 	i32 deltax;
 	i32 signdx;
@@ -224,7 +228,9 @@ void tran_thong(i32 xstart, i32 ystart, i32 xend, i32 yend, bool function(void*,
 			if (callback(userData, x, y)) return;
 		}
 	}
-	if (callback(userData, xend, yend)) return;
+
+	if (!(flags & LineVisitFlags.SKIP_END))
+		if (callback(userData, xend, yend)) return;
 }
 
 // Bresenham’s circle drawing algorithm

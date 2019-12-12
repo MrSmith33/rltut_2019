@@ -1,1 +1,1 @@
-build.cmd && cd bin && main.exe
+build.cmd && cd bin && start main.exe

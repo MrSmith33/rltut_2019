@@ -1,7 +1,16 @@
+import main;
+import tile;
 import utils;
+import death_functions;
 
 enum EntityFlags : u8 {
 	blocks    = 1 << 0,
+}
+
+enum RenderOrder : u8 {
+	CORPSE = 0,
+	ITEM = 1,
+	ACTOR = 2,
 }
 
 struct Entity
@@ -10,28 +19,77 @@ struct Entity
 	i32 y;
 	u8 flags;
 	u8 char;
+	u8 render_order;
 	u8 r;
 	u8 g;
 	u8 b;
 	u8[] name;
-
-	void move(i32 dx, i32 dy) {
-		print("Move ");
-		printInt(x);
-		print(" ");
-		printInt(y);
-		x += dx;
-		y += dy;
-		print(" -> ");
-		printInt(x);
-		print(" ");
-		printInt(y);
-		print(" ");
-		print(name);
-		println(null);
-	}
+	FighterId fighter;
+	AiId ai;
 
 	bool blocks() { return flags & EntityFlags.blocks; }
 }
 
 alias EntityId = u16;
+
+struct Fighter
+{
+	EntityId owner;
+	u16 max_hp;
+	u16 hp;
+	u16 defense;
+	u16 power;
+}
+alias FighterId = u16;
+
+struct Ai
+{
+	EntityId owner;
+}
+alias AiId = u16;
+
+void do_ai(GameMap* map, EntityId monsterId, EntityId targetId)
+{
+	Entity* monster = &map.entities[monsterId];
+	Entity* target = &map.entities[targetId];
+	Tile tile = map.tiles[monster.y][monster.x];
+	if (tile.visible)
+	{
+		Fighter* target_fighter = &map.fighters[target.fighter];
+		if (map.distance_between(monsterId, targetId) > 1)
+		{
+			map.move_towards(monsterId, target.x, target.y);
+		}
+		else if (target_fighter.hp > 0)
+		{
+			attack(map, monsterId, targetId);
+		}
+	}
+}
+
+void attack(GameMap* map, EntityId attackerId, EntityId targetId)
+{
+	Entity* attacker = &map.entities[attackerId];
+	Entity* target = &map.entities[targetId];
+	Fighter* attacker_fighter = &map.fighters[attacker.fighter];
+	Fighter* target_fighter = &map.fighters[target.fighter];
+	i32 damage = attacker_fighter.power - target_fighter.defense;
+	if (damage > 0) {
+		print(attacker.name); print(" "); printInt(attackerId);
+		print(" attacks "); print(target.name); print(" for "); printInt(damage); print(" hit points. ");
+		if (target_fighter.hp <= damage) {
+			target_fighter.hp = 0;
+			printInt(0);
+			println(" hp left.");
+			kill_entity(map, targetId);
+		}
+		else {
+			target_fighter.hp -= cast(u16)damage;
+			printInt(target_fighter.hp);
+			println(" hp left.");
+		}
+
+	} else {
+		print(attacker.name); print(" attacks "); print(target.name); println(" but does no damage.");
+	}
+}

@@ -28,8 +28,10 @@ struct GameMap
 	enum max_monsters_per_room = 8;
 	enum i32 room_min_size = 3;
 	enum i32 room_max_size = 20;
+	enum EntityId playerId = 0;
 
-	u64[2]* rand_state;
+	u8 game_state;
+	u64[2] rand_state;
 	i32 view_offset_x;
 	i32 view_offset_y;
 	i32 viewport_w;
@@ -37,13 +39,42 @@ struct GameMap
 	i32 view_radius;
 	Tile[map_width][map_height] tiles;
 	Entity[max_entities] entities;
-	u16 num_entities;
+	EntityId num_entities;
+	Fighter[max_entities] fighters;
+	FighterId num_fighters;
+	Ai[max_entities] ais;
+	AiId num_ais;
 
-	void add_entity(u8[] name, i32 x, i32 y, u8 c, u8 r, u8 g, u8 b, bool blocks)
+	void init(i32 window_w, i32 window_h)
 	{
-		Entity* entity = &entities[num_entities];
-		*entity = Entity(x, y, 0, c, r, g, b, name);
+		init_rand_state(&rand_state);
+		view_offset_x = 0;
+		view_offset_y = 0;
+		viewport_w = window_w / (TILE_W * scale);
+		viewport_h = window_h / (TILE_H * scale);
+		view_radius = 7;
+		num_entities = 0;
+		num_fighters = 0;
+		num_ais = 0;
+
+		// blocking_entity will be erased by initialize_tiles() and written by make_map()
+		EntityId eid = add_entity("Player", map_width/2, map_height/2, '@', RenderOrder.ACTOR, 255, 255, 255, true);
+		add_fighter(eid, 30, 30, 2, 5);
+
+		initialize_tiles();
+		make_map(&entities[0]);
+
+		game_state = GameState.PLAYER_TURN;
+	}
+
+	EntityId add_entity(u8[] name, i32 x, i32 y, u8 c, u8 render_order, u8 r, u8 g, u8 b, bool blocks)
+	{
+		EntityId eid = num_entities++;
+		Entity* entity = &entities[eid];
+		*entity = Entity(x, y, 0, c, render_order, r, g, b, name);
 		print("Add ");
+		printInt(eid);
+		print(" ");
 		print(name);
 		print(" at ");
 		printInt(x);
@@ -52,20 +83,40 @@ struct GameMap
 		println(";");
 		if (blocks) {
 			entity.flags |= EntityFlags.blocks;
-			tiles[y][x].blocking_entity = num_entities;
+			tiles[y][x].blocking_entity = eid;
 		}
-		++num_entities;
+		return eid;
 	}
 
-	Entity* get_blocking_entities_at_location(i32 x, i32 y)
+	void add_fighter(EntityId owner, u16 max_hp, u16 hp, u16 defense, u16 power)
 	{
-		for (u32 i = 0; i < num_entities; ++i)
+		FighterId fid = num_fighters++;
+		entities[owner].fighter = fid;
+		fighters[fid] = Fighter(owner, max_hp, hp, defense, power);
+		print("new fighter ");
+		printInt(owner); print(" id ");
+		printInt(fighters[fid].max_hp); print(" MAXHP ");
+		printInt(fighters[fid].hp); print(" HP ");
+		printInt(fighters[fid].defense); print(" DEF ");
+		printInt(fighters[fid].power); println(" STR");
+	}
+
+	void add_ai(EntityId owner)
+	{
+		AiId aid = num_ais++;
+		entities[owner].ai = aid;
+		ais[aid] = Ai(owner);
+	}
+
+	EntityId get_blocking_entities_at_location(i32 x, i32 y)
+	{
+		for (EntityId i = 0; i < num_entities; ++i)
 		{
 			Entity* e = &entities[i];
 			if (e.blocks && e.x == x && e.y == y)
-				return e;
+				return i;
 		}
-		return null;
+		return EntityId.max;
 	}
 
 	bool valid_pos(i32 x, i32 y)
@@ -101,8 +152,7 @@ struct GameMap
 		{
 			for (i32 x = 0; x < map_width; ++x)
 			{
-				tiles[y][x].flags = TileFlags.blocks_walk | TileFlags.blocks_sight;
-				tiles[y][x].blocking_entity = EntityId.max;
+				tiles[y][x] = Tile(TileFlags.blocks_walk | TileFlags.blocks_sight, 0, EntityId.max);
 			}
 		}
 	}
@@ -148,12 +198,12 @@ struct GameMap
 		for (u32 roomIndex = 0; roomIndex < max_rooms; ++roomIndex)
 		{
 			// random width and height
-			i32 w = cast(i32)uniform(room_min_size, room_max_size, rand_state);
-			i32 h = cast(i32)uniform(room_min_size, room_max_size, rand_state);
+			i32 w = cast(i32)uniform(room_min_size, room_max_size, &rand_state);
+			i32 h = cast(i32)uniform(room_min_size, room_max_size, &rand_state);
 
 			// random position without going out of the boundaries of the map
-			i32 x = cast(i32)uniform(0, map_width - w - 1, rand_state);
-			i32 y = cast(i32)uniform(0, map_height - h - 1, rand_state);
+			i32 x = cast(i32)uniform(0, map_width - w - 1, &rand_state);
+			i32 y = cast(i32)uniform(0, map_height - h - 1, &rand_state);
 
 			rooms[roomIndex] = Rect(x, y, x+w, y+h);
 
@@ -184,7 +234,7 @@ struct GameMap
 					Point prev;
 					rooms[roomIndex - 1].center(&prev);
 
-					if (uniform(0, 1, rand_state) == 1)
+					if (uniform(0, 1, &rand_state) == 1)
 					{
 						// first move horizontally, then vertically
 						create_h_tunnel(prev.x, new_x, prev.y);
@@ -206,23 +256,91 @@ struct GameMap
 	void place_entities(Rect room)
 	{
 		// Get a random number of monsters
-		i32 number_of_monsters = cast(i32)uniform(0, max_monsters_per_room, rand_state);
+		i32 number_of_monsters = cast(i32)uniform(0, max_monsters_per_room, &rand_state);
 
 		for (i32 i = 0; i < number_of_monsters; ++i)
 		{
 			// Choose a random location in the room
-			i32 x = cast(i32)uniform(room.x1 + 1, room.x2 - 1, rand_state);
-			i32 y = cast(i32)uniform(room.y1 + 1, room.y2 - 1, rand_state);
+			i32 x = cast(i32)uniform(room.x1 + 1, room.x2 - 1, &rand_state);
+			i32 y = cast(i32)uniform(room.y1 + 1, room.y2 - 1, &rand_state);
 
 			if (!tiles[y][x].has_blocking_entity)
 			{
-				if (uniform(0, 100, rand_state) < 80)
-					add_entity("Orc", x, y, 142, 0, 250, 0, true);
+				if (uniform(0, 100, &rand_state) < 80)
+				{
+					EntityId eid = add_entity("Orc", x, y, 'o', RenderOrder.ACTOR, 0, 250, 0, true);
+					add_fighter(eid, 10, 10, 0, 3);
+					add_ai(eid);
+				}
 				else
-					add_entity("Troll", x, y, 115, 0, 200, 0, true);
+				{
+					EntityId eid = add_entity("Troll", x, y, 'T', RenderOrder.ACTOR, 0, 200, 0, true);
+					add_fighter(eid, 16, 16, 1, 4);
+					add_ai(eid);
+				}
 			}
 		}
 	}
+
+	void move_to(EntityId eid, i32 dest_x, i32 dest_y)
+	{
+		Entity* e = &entities[eid];
+
+		print("Move ");
+		printInt(e.x);
+		print(" ");
+		printInt(e.y);
+		print(" -> ");
+		printInt(dest_x);
+		print(" ");
+		printInt(dest_y);
+		print(" ");
+		print(e.name);
+		println(null);
+
+		tiles[e.y][e.x].blocking_entity = EntityId.max;
+		e.x = dest_x;
+		e.y = dest_y;
+		tiles[dest_y][dest_x].blocking_entity = eid;
+	}
+
+	i32 distance_between(EntityId eid_a, EntityId eid_b)
+	{
+		Entity* a = &entities[eid_a];
+		Entity* b = &entities[eid_b];
+		i32 dx = abs(b.x - a.x);
+		i32 dy = abs(b.y - a.y);
+		return max(dx, dy);
+	}
+
+	void move_towards(EntityId eid, i32 target_x, i32 target_y)
+	{
+		MoveData data = MoveData(this, eid, 0);
+		Entity* e = &entities[eid];
+		tran_thong(e.x, e.y, target_x, target_y, &move_visitor, cast(void*)&data, LineVisitFlags.SKIP_START);
+	}
+}
+
+struct MoveData
+{
+	GameMap* map;
+	EntityId eid;
+}
+
+bool move_visitor(void* _data, i32 x, i32 y)
+{
+	MoveData data = *cast(MoveData*)_data;
+
+	if (!data.map.blocks_walk(x, y))
+	{
+		EntityId targetId = data.map.get_blocking_entities_at_location(x, y);
+		if (targetId == EntityId.max)
+		{
+			Entity* e = &data.map.entities[data.eid];
+			data.map.move_to(data.eid, x, y);
+		}
+	}
+	return true;
 }
 
 enum VIEW_RADIUS = 7;
@@ -268,23 +386,49 @@ void update_fov(GameMap* map, Entity* player)
 	i32 view_radius = map.view_radius;
 	for (i32 i = -view_radius; i <= view_radius; ++i)
 	{
-		tran_thong(0, 0, -view_radius, i, &visibility_check, cast(void*)&data);
-		tran_thong(0, 0,  view_radius, i, &visibility_check, cast(void*)&data);
-		tran_thong(0, 0,  i,  view_radius, &visibility_check, cast(void*)&data);
-		tran_thong(0, 0,  i, -view_radius, &visibility_check, cast(void*)&data);
+		tran_thong(0, 0, -view_radius, i, &visibility_check, cast(void*)&data, 0);
+		tran_thong(0, 0,  view_radius, i, &visibility_check, cast(void*)&data, 0);
+		tran_thong(0, 0,  i,  view_radius, &visibility_check, cast(void*)&data, 0);
+		tran_thong(0, 0,  i, -view_radius, &visibility_check, cast(void*)&data, 0);
+	}
+}
+
+void render_int(Window* win, i64 i, i32 x, i32 y)
+{
+	u8[21] buf;
+	u8[] res = formatInt(i, &buf, 1);
+	render_string(win, res, x, y);
+}
+
+void render_string(Window* win, u8[] str, i32 x, i32 y)
+{
+	y *= scale * TILE_H;
+	for (u64 i = 0; i < str.length; ++i)
+	{
+		i32 char_id = cast(i32)str[i] - 32;
+		i32 from_x = (char_id % 32) * TILE_W;
+		i32 from_y = (char_id / 32) * TILE_H;
+		SDL_Rect from = SDL_Rect(from_x, from_y, TILE_W, TILE_H);
+		SDL_Rect to = SDL_Rect(
+			(x + cast(i32)i) * scale * TILE_W,
+			y,
+			TILE_W * scale, TILE_H * scale);
+
+		SDL_RenderCopy(win.sdl_renderer, win.font, &from, &to);
 	}
 }
 
 void render_all(Window* win, GameMap* map)
 {
-	SDL_Rect from;
-	SDL_Rect to;
-
+	// Render tiles
 	for (i32 y = 0; y < map.map_height; ++y)
 	{
 		for (i32 x = 0; x < map.map_width; ++x)
 		{
-			Tile tile = map.tiles[y][x];
+			Tile* tile_ptr = &map.tiles[y][x];
+			tile_ptr.max_render_order = 0; // reset ordering
+			Tile tile = *tile_ptr;
+
 			if (tile.visible)
 			{
 				if (tile.block_sight) {
@@ -311,7 +455,7 @@ void render_all(Window* win, GameMap* map)
 
 
 			//SDL_SetRenderDrawColor(win.sdl_renderer, color[0], color[1], color[2]);
-			to = SDL_Rect(
+			SDL_Rect to = SDL_Rect(
 				x * scale * TILE_W + map.view_offset_x,
 				y * scale * TILE_H + map.view_offset_y,
 				TILE_W * scale,
@@ -320,33 +464,54 @@ void render_all(Window* win, GameMap* map)
 		}
 	}
 
-	for (u32 i = 0; i < map.num_entities; ++i)
+	// Render visible entities
+	for (EntityId i = 0; i < map.num_entities; ++i)
 	{
-		Tile tile = map.tiles[map.entities[i].y][map.entities[i].x];
-		if (!tile.visible) continue;
-		from = SDL_Rect(map.entities[i].char * TILE_W, 0, TILE_W, TILE_H); // TODO: use letter coords from font
-		to = SDL_Rect(
-			map.entities[i].x * scale * TILE_W + map.view_offset_x,
-			map.entities[i].y * scale * TILE_H + map.view_offset_y,
-			TILE_W * scale, TILE_H * scale); // TODO: use letter coords from font
+		Entity* e = &map.entities[i];
+		Tile* tile = &map.tiles[e.y][e.x];
 
-		SDL_SetTextureColorMod(win.font, map.entities[i].r, map.entities[i].g, map.entities[i].b);
+		// only show visible entities
+		if (!tile.visible) continue;
+
+		// only show if no entity with higher order was drawn to this tile
+		if (tile.max_render_order > e.render_order) continue;
+		tile.max_render_order = e.render_order;
+
+		i32 char_id = cast(i32)e.char - 32;
+		i32 from_x = (char_id % 32) * TILE_W;
+		i32 from_y = (char_id / 32) * TILE_H;
+		SDL_Rect from = SDL_Rect(from_x, from_y, TILE_W, TILE_H);
+		SDL_Rect to = SDL_Rect(
+			e.x * scale * TILE_W + map.view_offset_x,
+			e.y * scale * TILE_H + map.view_offset_y,
+			TILE_W * scale, TILE_H * scale);
+
+		//SDL_SetRenderDrawColor(win.sdl_renderer, e.r, e.g, e.b, 255);
+		//SDL_RenderFillRect(win.sdl_renderer, &to);
+		SDL_SetTextureColorMod(win.font, e.r, e.g, e.b);
 		SDL_RenderCopy(win.sdl_renderer, win.font, &from, &to);
 	}
+
+	// Show HP
+	SDL_SetTextureColorMod(win.font, 255, 255, 255);
+	Entity* player = &map.entities[map.playerId];
+	Fighter* player_fighter = &map.fighters[player.fighter];
+	render_string(win, "HP:", 0, 0);
+	render_int(win, player_fighter.hp, 3, 0);
+	render_string(win, "/", 6, 0);
+	render_int(win, player_fighter.max_hp, 7, 0);
 }
 
 GameMap global_map;
 
 enum GameState : u8 {
-	player_turn = 0,
-	enemy_turn = 1,
+	PLAYER_TURN = 0,
+	ENEMY_TURN = 1,
+	PLAYER_DEAD = 2,
 }
 
 i32 main(void* hInstance, void* hPrevInstance, u8* lpCmdLine, i32 nShowCmd)
 {
-	u64[2] rand_state;
-	init_rand_state(&rand_state);
-
 	Window win;
 	i32 SCREEN_WIDTH = 800;
 	i32 SCREEN_HEIGHT = 600;
@@ -357,29 +522,15 @@ i32 main(void* hInstance, void* hPrevInstance, u8* lpCmdLine, i32 nShowCmd)
 	SDL_Event e;
 
 	GameMap* map = &global_map;
-	map.rand_state = &rand_state;
-	map.view_offset_x = 0;
-	map.view_offset_y = 0;
-	map.view_radius = 7;
-	map.viewport_w = SCREEN_WIDTH / (TILE_W * scale);
-	map.viewport_h = SCREEN_HEIGHT / (TILE_H * scale);
-	map.num_entities = 0;
+	map.init(SCREEN_WIDTH, SCREEN_HEIGHT);
 
-	map.add_entity("Player", map.map_width/2, map.map_height/2, 32, 0, 255, 0, true);
-	Entity* player = &map.entities[0];
-
-	map.initialize_tiles();
-	map.make_map(player);
-
+	Entity* player = &map.entities[map.playerId];
 	bool recalc_fov = true;
-
-	i32 mouse_x;
-	i32 mouse_y;
-
-	u8 game_state = GameState.player_turn;
 
 	while (run)
 	{
+		i32 mouse_x;
+		i32 mouse_y;
 		u32 buttons_pressed = SDL_GetMouseState(&mouse_x, &mouse_y);
 		i32 cursor_map_x = (mouse_x - map.view_offset_x) / (TILE_W * scale);
 		i32 cursor_map_y = (mouse_y - map.view_offset_y) / (TILE_H * scale);
@@ -410,68 +561,82 @@ i32 main(void* hInstance, void* hPrevInstance, u8* lpCmdLine, i32 nShowCmd)
 			else if (e.type == SDL_EventType.SDL_KEYDOWN)
 			{
 				SDL_KeyboardEvent* key = cast(SDL_KeyboardEvent*)&e;
-				if (key.keysym.scancode == SDL_Scancode.SDL_SCANCODE_ESCAPE) {
+				u32 scancode = key.keysym.scancode;
+				if (scancode == SDL_Scancode.SDL_SCANCODE_ESCAPE) {
 					run = false;
 				}
 
-				if (key.keysym.scancode == SDL_Scancode.SDL_SCANCODE_D) {
+				if (scancode >= SDL_Scancode.SDL_SCANCODE_KP_1 && scancode <= SDL_Scancode.SDL_SCANCODE_KP_9) {
 					doMove = true;
-					++dx;
-				} else if (key.keysym.scancode == SDL_Scancode.SDL_SCANCODE_A) {
-					doMove = true;
-					--dx;
-				} else if (key.keysym.scancode == SDL_Scancode.SDL_SCANCODE_W) {
-					doMove = true;
-					--dy;
-				} else if (key.keysym.scancode == SDL_Scancode.SDL_SCANCODE_S) {
-					doMove = true;
-					++dy;
-				} else if (key.keysym.scancode == SDL_Scancode.SDL_SCANCODE_LEFTBRACKET) {
+				}
+
+				if (scancode == SDL_Scancode.SDL_SCANCODE_KP_1) {
+					dx = -1; dy = 1;
+				} else if (scancode == SDL_Scancode.SDL_SCANCODE_KP_2) {
+					dy = -1; dy = 1;
+				} else if (scancode == SDL_Scancode.SDL_SCANCODE_KP_3) {
+					dx = 1; dy = 1;
+				} else if (scancode == SDL_Scancode.SDL_SCANCODE_KP_4) {
+					dx = -1;
+				} else if (scancode == SDL_Scancode.SDL_SCANCODE_KP_5) {
+					// wait
+					if (map.game_state == GameState.PLAYER_TURN)
+					{
+						map.game_state = GameState.ENEMY_TURN;
+						continue;
+					}
+				} else if (scancode == SDL_Scancode.SDL_SCANCODE_KP_6) {
+					dx = 1;
+				} else if (scancode == SDL_Scancode.SDL_SCANCODE_KP_7) {
+					dx = -1; dy = -1;
+				} else if (scancode == SDL_Scancode.SDL_SCANCODE_KP_8) {
+					dy = -1; dy = -1;
+				} else if (scancode == SDL_Scancode.SDL_SCANCODE_KP_9) {
+					dx = 1; dy = -1;
+				} else if (scancode == SDL_Scancode.SDL_SCANCODE_LEFTBRACKET) {
 					if (map.view_radius > 0) {
 						--map.view_radius;
 						recalc_fov = true;
 					}
-				} else if (key.keysym.scancode == SDL_Scancode.SDL_SCANCODE_RIGHTBRACKET) {
+				} else if (scancode == SDL_Scancode.SDL_SCANCODE_RIGHTBRACKET) {
 					++map.view_radius;
 					recalc_fov = true;
 				}
 			}
 
-			if (doMove && game_state == GameState.player_turn)
+			if (doMove && map.game_state == GameState.PLAYER_TURN)
 			{
 				i32 destx = player.x + dx;
 				i32 desty = player.y + dy;
 
 				if (!map.blocks_walk(destx, desty))
 				{
-					Entity* target = map.get_blocking_entities_at_location(destx, desty);
+					EntityId targetId = map.get_blocking_entities_at_location(destx, desty);
 
-					if (target != null)
+					if (targetId != EntityId.max)
 					{
-						print("You kick the ");
-						print(target.name);
-						println(" in the shins, much to its annoyance!");
+						attack(map, map.playerId, targetId);
 					}
 					else
 					{
 						recalc_fov = true;
-						player.move(dx, dy);
+						map.move_to(map.playerId, destx, desty);
 					}
-					game_state = GameState.enemy_turn;
+					map.game_state = GameState.ENEMY_TURN;
 				}
 			}
 		}
 
-		if (game_state == GameState.enemy_turn)
+		if (map.game_state == GameState.ENEMY_TURN)
 		{
-			for (u32 i = 1; i < map.num_entities; ++i)
+			map.game_state = GameState.PLAYER_TURN;
+			for (EntityId i = 1; i < map.num_entities; ++i)
 			{
 				Entity* e = &map.entities[i];
-				print("The ");
-				print(e.name);
-				println(" ponders the meaning of its existence.");
+				if (e.ai == AiId.max) continue;
+				do_ai(map, i, map.playerId);
+				if (map.game_state == GameState.PLAYER_DEAD) break;
 			}
-			game_state = GameState.player_turn;
 		}
 
 		SDL_SetRenderDrawColor(win.sdl_renderer, 0, 0, 0, 0);
@@ -484,6 +649,7 @@ i32 main(void* hInstance, void* hPrevInstance, u8* lpCmdLine, i32 nShowCmd)
 		}
 		render_all(&win, map);
 		SDL_RenderPresent(win.sdl_renderer);
+		SDL_Delay(40);
 	}
 
 	window_destroy(&win);

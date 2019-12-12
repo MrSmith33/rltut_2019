@@ -12,7 +12,8 @@ enum TileFlags : u8 {
 struct Tile
 {
 	u8 flags;
-	EntityId blocking_entity;
+	u8 max_render_order;
+	EntityId blocking_entity = EntityId.max;
 	bool blocked() { return (flags & TileFlags.blocks_walk) != 0; }
 	bool block_sight() { return (flags & TileFlags.blocks_sight) != 0; }
 	bool visible() { return (flags & TileFlags.is_visible) != 0; }

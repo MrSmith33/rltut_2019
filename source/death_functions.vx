@@ -1,0 +1,38 @@
+import main;
+import entity;
+import utils;
+
+void kill_entity(GameMap* map, EntityId eid)
+{
+	if (eid == 0)
+		kill_player(map, eid);
+	else
+		kill_monster(map, eid);
+}
+
+void kill_player(GameMap* map, EntityId eid)
+{
+	Entity* player = &map.entities[eid];
+	player.char = '%';
+	player.r = 150;
+	player.g = 0;
+	player.b = 0;
+	player.render_order = RenderOrder.CORPSE;
+	map.game_state = GameState.PLAYER_DEAD;
+	println("You died!");
+}
+
+void kill_monster(GameMap* map, EntityId eid)
+{
+	Entity* monster = &map.entities[eid];
+	monster.char = '%';
+	monster.r = 150;
+	monster.g = 0;
+	monster.b = 0;
+	monster.render_order = RenderOrder.CORPSE;
+	monster.ai = AiId.max;
+	monster.fighter = FighterId.max;
+	monster.flags &= ~EntityFlags.blocks;
+	print(monster.name);
+	println(" is dead!");
+}

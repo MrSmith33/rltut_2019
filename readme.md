@@ -8,7 +8,7 @@
 
 Compile with `build.cmd` script.
 
-Produces `main.exe` for win64.
+Produces `bin/main.exe` for win64.
 
 Or compile and run with `run.cmd`
 
