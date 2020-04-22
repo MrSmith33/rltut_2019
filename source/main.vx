@@ -8,15 +8,21 @@ import tile;
 import entity;
 
 enum scale = 2;
-enum i32 TILE_W = 10;
-enum i32 TILE_H = 10;
-enum Color DARK_WALL = Color(0, 0, 100);
-enum Color DARK_GROUND = Color(50, 50, 150);
+enum i32 TILE_SIZE = 10;
+
+enum Colors : Color {
+	UNEXPLORED = Color(0, 0, 0),
+	DARK_WALL = Color(0, 0, 100),
+	DARK_GROUND = Color(50, 50, 150),
+	LIGHT_WALL = Color(20, 20, 120),
+	LIGHT_GROUND = Color(70, 70, 170),
+}
 
 struct Color {
 	u8 r;
 	u8 g;
 	u8 b;
+	u8 a = 255;
 }
 
 struct GameMap
@@ -50,8 +56,8 @@ struct GameMap
 		init_rand_state(&rand_state);
 		view_offset_x = 0;
 		view_offset_y = 0;
-		viewport_w = window_w / (TILE_W * scale);
-		viewport_h = window_h / (TILE_H * scale);
+		viewport_w = window_w / (TILE_SIZE * scale);
+		viewport_h = window_h / (TILE_SIZE * scale);
 		view_radius = 7;
 		num_entities = 0;
 		num_fighters = 0;
@@ -72,15 +78,17 @@ struct GameMap
 		EntityId eid = num_entities++;
 		Entity* entity = &entities[eid];
 		*entity = Entity(x, y, 0, c, render_order, r, g, b, name);
-		print("Add ");
-		printInt(eid);
-		print(" ");
-		print(name);
-		print(" at ");
-		printInt(x);
-		print(", ");
-		printInt(y);
-		println(";");
+		// future: println("Add $eid $name at $x, $y;");
+		// future: println("Add {} {} at {}, {};", eid, name, x, y);
+		//print("Add ");
+		//printInt(eid);
+		//print(" ");
+		//print(name);
+		//print(" at ");
+		//printInt(x);
+		//print(", ");
+		//printInt(y);
+		//println(";");
 		if (blocks) {
 			entity.flags |= EntityFlags.blocks;
 			tiles[y][x].blocking_entity = eid;
@@ -93,12 +101,12 @@ struct GameMap
 		FighterId fid = num_fighters++;
 		entities[owner].fighter = fid;
 		fighters[fid] = Fighter(owner, max_hp, hp, defense, power);
-		print("new fighter ");
-		printInt(owner); print(" id ");
-		printInt(fighters[fid].max_hp); print(" MAXHP ");
-		printInt(fighters[fid].hp); print(" HP ");
-		printInt(fighters[fid].defense); print(" DEF ");
-		printInt(fighters[fid].power); println(" STR");
+		//print("new fighter ");
+		//printInt(owner); print(" id ");
+		//printInt(fighters[fid].max_hp); print(" MAXHP ");
+		//printInt(fighters[fid].hp); print(" HP ");
+		//printInt(fighters[fid].defense); print(" DEF ");
+		//printInt(fighters[fid].power); println(" STR");
 	}
 
 	void add_ai(EntityId owner)
@@ -142,8 +150,8 @@ struct GameMap
 		i32 halfw = viewport_w / 2;
 		i32 halfh = viewport_h / 2;
 
-		view_offset_x = (halfw - player_x) * TILE_W * scale;
-		view_offset_y = (halfh - player_y) * TILE_H * scale;
+		view_offset_x = (halfw - player_x) * TILE_SIZE * scale;
+		view_offset_y = (halfh - player_y) * TILE_SIZE * scale;
 	}
 
 	void initialize_tiles()
@@ -171,8 +179,8 @@ struct GameMap
 
 	void create_h_tunnel(i32 x1, i32 x2, i32 y)
 	{
-		i32 max_x = max(x1, x2) + 1;
-		for (i32 x = min(x1, x2); x < max_x; ++x)
+		i32 max_x = max[i32](x1, x2) + 1;
+		for (i32 x = min[i32](x1, x2); x < max_x; ++x)
 		{
 			tiles[y][x].flags &= ~(TileFlags.blocks_walk | TileFlags.blocks_sight);
 			tiles[y][x].flags |= TileFlags.is_visible;
@@ -181,8 +189,8 @@ struct GameMap
 
 	void create_v_tunnel(i32 y1, i32 y2, i32 x)
 	{
-		i32 max_y = max(y1, y2) + 1;
-		for (i32 y = min(y1, y2); y < max_y; ++y)
+		i32 max_y = max[i32](y1, y2) + 1;
+		for (i32 y = min[i32](y1, y2); y < max_y; ++y)
 		{
 			tiles[y][x].flags &= ~(TileFlags.blocks_walk | TileFlags.blocks_sight);
 			tiles[y][x].flags |= TileFlags.is_visible;
@@ -286,17 +294,17 @@ struct GameMap
 	{
 		Entity* e = &entities[eid];
 
-		print("Move ");
-		printInt(e.x);
-		print(" ");
-		printInt(e.y);
-		print(" -> ");
-		printInt(dest_x);
-		print(" ");
-		printInt(dest_y);
-		print(" ");
-		print(e.name);
-		println(null);
+		//print("Move ");
+		//printInt(e.x);
+		//print(" ");
+		//printInt(e.y);
+		//print(" -> ");
+		//printInt(dest_x);
+		//print(" ");
+		//printInt(dest_y);
+		//print(" ");
+		//print(e.name);
+		//println;
 
 		tiles[e.y][e.x].blocking_entity = EntityId.max;
 		e.x = dest_x;
@@ -310,7 +318,7 @@ struct GameMap
 		Entity* b = &entities[eid_b];
 		i32 dx = abs(b.x - a.x);
 		i32 dy = abs(b.y - a.y);
-		return max(dx, dy);
+		return max[i32](dx, dy);
 	}
 
 	void move_towards(EntityId eid, i32 target_x, i32 target_y)
@@ -325,6 +333,11 @@ struct MoveData
 {
 	GameMap* map;
 	EntityId eid;
+}
+
+struct Panel
+{
+
 }
 
 bool move_visitor(void* _data, i32 x, i32 y)
@@ -402,17 +415,17 @@ void render_int(Window* win, i64 i, i32 x, i32 y)
 
 void render_string(Window* win, u8[] str, i32 x, i32 y)
 {
-	y *= scale * TILE_H;
+	y *= scale * TILE_SIZE;
 	for (u64 i = 0; i < str.length; ++i)
 	{
 		i32 char_id = cast(i32)str[i] - 32;
-		i32 from_x = (char_id % 32) * TILE_W;
-		i32 from_y = (char_id / 32) * TILE_H;
-		SDL_Rect from = SDL_Rect(from_x, from_y, TILE_W, TILE_H);
+		i32 from_x = (char_id % 32) * TILE_SIZE;
+		i32 from_y = (char_id / 32) * TILE_SIZE;
+		SDL_Rect from = SDL_Rect(from_x, from_y, TILE_SIZE, TILE_SIZE);
 		SDL_Rect to = SDL_Rect(
-			(x + cast(i32)i) * scale * TILE_W,
+			(x + cast(i32)i) * scale * TILE_SIZE,
 			y,
-			TILE_W * scale, TILE_H * scale);
+			TILE_SIZE * scale, TILE_SIZE * scale);
 
 		SDL_RenderCopy(win.sdl_renderer, win.font, &from, &to);
 	}
@@ -429,37 +442,27 @@ void render_all(Window* win, GameMap* map)
 			tile_ptr.max_render_order = 0; // reset ordering
 			Tile tile = *tile_ptr;
 
+			Color color;
 			if (tile.visible)
 			{
-				if (tile.block_sight) {
-					SDL_SetRenderDrawColor(win.sdl_renderer, 20, 20, 120, 255);
-					//color = LIGHT_WALL;
-				} else {
-					SDL_SetRenderDrawColor(win.sdl_renderer, 70, 70, 170, 255);
-					//color = LIGHT_GROUND;
-				}
+				if (tile.block_sight) color = Colors.LIGHT_WALL;
+				else color = Colors.LIGHT_GROUND;
 				map.tiles[y][x].flags |= TileFlags.is_explored;
 			}
 			else if (tile.explored)
 			{
-				if (tile.block_sight) {
-					SDL_SetRenderDrawColor(win.sdl_renderer, 0, 0, 100, 255);
-					//color = DARK_WALL;
-				} else {
-					SDL_SetRenderDrawColor(win.sdl_renderer, 50, 50, 150, 255);
-					//color = DARK_GROUND;
-				}
+				if (tile.block_sight) color = Colors.DARK_WALL;
+				else color = Colors.DARK_GROUND;
 			}
-			else
-				SDL_SetRenderDrawColor(win.sdl_renderer, 0, 0, 0, 255);
+			else color = Colors.UNEXPLORED;
 
+			SDL_SetRenderDrawColor(win.sdl_renderer, color.r, color.g, color.b, color.a);
 
-			//SDL_SetRenderDrawColor(win.sdl_renderer, color[0], color[1], color[2]);
 			SDL_Rect to = SDL_Rect(
-				x * scale * TILE_W + map.view_offset_x,
-				y * scale * TILE_H + map.view_offset_y,
-				TILE_W * scale,
-				TILE_H * scale);
+				x * scale * TILE_SIZE + map.view_offset_x,
+				y * scale * TILE_SIZE + map.view_offset_y,
+				TILE_SIZE * scale,
+				TILE_SIZE * scale);
 			SDL_RenderFillRect(win.sdl_renderer, &to);
 		}
 	}
@@ -478,13 +481,13 @@ void render_all(Window* win, GameMap* map)
 		tile.max_render_order = e.render_order;
 
 		i32 char_id = cast(i32)e.char - 32;
-		i32 from_x = (char_id % 32) * TILE_W;
-		i32 from_y = (char_id / 32) * TILE_H;
-		SDL_Rect from = SDL_Rect(from_x, from_y, TILE_W, TILE_H);
+		i32 from_x = (char_id % 32) * TILE_SIZE;
+		i32 from_y = (char_id / 32) * TILE_SIZE;
+		SDL_Rect from = SDL_Rect(from_x, from_y, TILE_SIZE, TILE_SIZE);
 		SDL_Rect to = SDL_Rect(
-			e.x * scale * TILE_W + map.view_offset_x,
-			e.y * scale * TILE_H + map.view_offset_y,
-			TILE_W * scale, TILE_H * scale);
+			e.x * scale * TILE_SIZE + map.view_offset_x,
+			e.y * scale * TILE_SIZE + map.view_offset_y,
+			TILE_SIZE * scale, TILE_SIZE * scale);
 
 		//SDL_SetRenderDrawColor(win.sdl_renderer, e.r, e.g, e.b, 255);
 		//SDL_RenderFillRect(win.sdl_renderer, &to);
@@ -502,6 +505,11 @@ void render_all(Window* win, GameMap* map)
 	render_int(win, player_fighter.max_hp, 7, 0);
 }
 
+void render_bar(Window* win, i32 x, i32 y, i32 total_width, u8[] name, i32 value, i32 max_value, Color bar_color, Color back_color)
+{
+	i32 bar_width = value / (max_value * total_width);
+}
+
 GameMap global_map;
 
 enum GameState : u8 {
@@ -513,16 +521,26 @@ enum GameState : u8 {
 i32 main(void* hInstance, void* hPrevInstance, u8* lpCmdLine, i32 nShowCmd)
 {
 	Window win;
-	i32 SCREEN_WIDTH = 800;
-	i32 SCREEN_HEIGHT = 600;
+	i32 screen_width = 1200;
+	i32 screen_height = 800;
+	enum BAR_WIDTH = 20;
+	enum PANEL_HEIGHT = 7;
+	i32 panel_y = screen_height - PANEL_HEIGHT;
 
-	window_init(&win, SCREEN_WIDTH, SCREEN_HEIGHT, "RL tutorial in Vox lang");
+	window_init(&win, screen_width, screen_height, "RL tutorial in Vox lang");
+
+	Array[i32] points;
+	points.put(42);
+	points.put(33);
+	printArray[i32](points.data);
+	println;
+
 
 	bool run = true;
 	SDL_Event e;
 
 	GameMap* map = &global_map;
-	map.init(SCREEN_WIDTH, SCREEN_HEIGHT);
+	map.init(screen_width, screen_height);
 
 	Entity* player = &map.entities[map.playerId];
 	bool recalc_fov = true;
@@ -532,8 +550,8 @@ i32 main(void* hInstance, void* hPrevInstance, u8* lpCmdLine, i32 nShowCmd)
 		i32 mouse_x;
 		i32 mouse_y;
 		u32 buttons_pressed = SDL_GetMouseState(&mouse_x, &mouse_y);
-		i32 cursor_map_x = (mouse_x - map.view_offset_x) / (TILE_W * scale);
-		i32 cursor_map_y = (mouse_y - map.view_offset_y) / (TILE_H * scale);
+		i32 cursor_map_x = (mouse_x - map.view_offset_x) / (TILE_SIZE * scale);
+		i32 cursor_map_y = (mouse_y - map.view_offset_y) / (TILE_SIZE * scale);
 
 		if (map.valid_pos(cursor_map_x, cursor_map_y))
 		{
@@ -570,37 +588,35 @@ i32 main(void* hInstance, void* hPrevInstance, u8* lpCmdLine, i32 nShowCmd)
 					doMove = true;
 				}
 
-				if (scancode == SDL_Scancode.SDL_SCANCODE_KP_1) {
-					dx = -1; dy = 1;
-				} else if (scancode == SDL_Scancode.SDL_SCANCODE_KP_2) {
-					dy = -1; dy = 1;
-				} else if (scancode == SDL_Scancode.SDL_SCANCODE_KP_3) {
-					dx = 1; dy = 1;
-				} else if (scancode == SDL_Scancode.SDL_SCANCODE_KP_4) {
-					dx = -1;
-				} else if (scancode == SDL_Scancode.SDL_SCANCODE_KP_5) {
-					// wait
-					if (map.game_state == GameState.PLAYER_TURN)
-					{
-						map.game_state = GameState.ENEMY_TURN;
-						continue;
+				switch(scancode)
+				{
+					SDL_Scancode.SDL_SCANCODE_KP_1 { dx = -1; dy = 1; }
+					SDL_Scancode.SDL_SCANCODE_KP_2 { dy = -1; dy = 1; }
+					SDL_Scancode.SDL_SCANCODE_KP_3 { dx =  1; dy = 1; }
+					SDL_Scancode.SDL_SCANCODE_KP_4 { dx = -1; }
+					SDL_Scancode.SDL_SCANCODE_KP_5 {
+						// wait
+						if (map.game_state == GameState.PLAYER_TURN)
+						{
+							map.game_state = GameState.ENEMY_TURN;
+							continue;
+						}
 					}
-				} else if (scancode == SDL_Scancode.SDL_SCANCODE_KP_6) {
-					dx = 1;
-				} else if (scancode == SDL_Scancode.SDL_SCANCODE_KP_7) {
-					dx = -1; dy = -1;
-				} else if (scancode == SDL_Scancode.SDL_SCANCODE_KP_8) {
-					dy = -1; dy = -1;
-				} else if (scancode == SDL_Scancode.SDL_SCANCODE_KP_9) {
-					dx = 1; dy = -1;
-				} else if (scancode == SDL_Scancode.SDL_SCANCODE_LEFTBRACKET) {
-					if (map.view_radius > 0) {
-						--map.view_radius;
+					SDL_Scancode.SDL_SCANCODE_KP_6 { dx = 1; }
+					SDL_Scancode.SDL_SCANCODE_KP_7 { dx = -1; dy = -1; }
+					SDL_Scancode.SDL_SCANCODE_KP_8 { dy = -1; dy = -1; }
+					SDL_Scancode.SDL_SCANCODE_KP_9 { dx = 1; dy = -1; }
+					SDL_Scancode.SDL_SCANCODE_LEFTBRACKET {
+						if (map.view_radius > 0) {
+							--map.view_radius;
+							recalc_fov = true;
+						}
+					}
+					SDL_Scancode.SDL_SCANCODE_RIGHTBRACKET {
+						++map.view_radius;
 						recalc_fov = true;
 					}
-				} else if (scancode == SDL_Scancode.SDL_SCANCODE_RIGHTBRACKET) {
-					++map.view_radius;
-					recalc_fov = true;
+					else {}
 				}
 			}
 

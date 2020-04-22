@@ -13,7 +13,7 @@ struct Tile
 {
 	u8 flags;
 	u8 max_render_order;
-	EntityId blocking_entity = EntityId.max;
+	EntityId blocking_entity;
 	bool blocked() { return (flags & TileFlags.blocks_walk) != 0; }
 	bool block_sight() { return (flags & TileFlags.blocks_sight) != 0; }
 	bool visible() { return (flags & TileFlags.is_visible) != 0; }

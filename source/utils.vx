@@ -1,11 +1,11 @@
 import kernel32;
 
-i32 min(i32 a, i32 b) {
+T min[T](T a, T b) {
 	if (a < b) return a;
 	return b;
 }
 
-i32 max(i32 a, i32 b) {
+T max[T](T a, T b) {
 	if (a > b) return a;
 	return b;
 }
@@ -13,6 +13,92 @@ i32 max(i32 a, i32 b) {
 i32 abs(i32 a) {
 	if (a < 0) return -a;
 	return a;
+}
+
+T[] makeArray[T](u64 length)
+{
+	import kernel32;
+	T* ptr = cast(T*)HeapAlloc(GetProcessHeap(), 0, length * T.sizeof);
+	return ptr[0..length];
+}
+
+void freeArray[T](T[] array)
+{
+	import kernel32;
+	HeapFree(GetProcessHeap(), 0, cast(void*)array.ptr);
+}
+
+#if(0)
+{
+	void memcopy(u8[] dst, u8[] src)
+	{
+		u64 len = min[u64](dst.length, src.length);
+		if (len == 0) return;
+		u8* dst_ptr = dst.ptr;
+		u8* src_ptr = src.ptr;
+		for (u64 i = 0; i < len; ++i)
+			dst_ptr[i] = src_ptr[i];
+	}
+}
+else
+{
+	void memcopy(u8[] dst, u8[] src)
+	{
+		u64 len = min[u64](dst.length, src.length);
+		if (len == 0) return;
+		RtlCopyMemory(cast(void*)dst.ptr, cast(void*)src.ptr, len);
+	}
+}
+
+struct Array[T]
+{
+	T* bufPtr;
+	u32 length;
+	u32 capacity;
+
+	T* get(u64 index) {
+		return &bufPtr[index];
+	}
+
+	T[] data()
+	{
+		return bufPtr[0..length];
+	}
+
+	void put(T item)
+	{
+		if (length == capacity) extend(1);
+		bufPtr[length] = item;
+		++length;
+	}
+
+	void extend(u32 items)
+	{
+		enum u32 MIN_CAPACITY = T.sizeof * 4;
+		u64 bytesNeeded = (length + items) * T.sizeof;
+		u32 capacityNeeded = cast(u32)nextPOT[u32](cast(u32)bytesNeeded);
+		capacityNeeded = max[u32](capacityNeeded, MIN_CAPACITY);
+		HANDLE heap = GetProcessHeap();
+		u8* newBlock = cast(u8*)HeapAlloc(heap, 0, capacityNeeded);
+		memcopy(newBlock[0..length * T.sizeof], (cast(u8*)bufPtr)[0..length * T.sizeof]);
+		HeapFree(heap, 0, cast(void*)bufPtr);
+		bufPtr = cast(T*)newBlock;
+		capacity = cast(u32)(capacityNeeded / T.sizeof);
+	}
+}
+
+T nextPOT[T](T x)
+{
+	--x;
+	x |= x >> 1;  // handle  2 bit numbers
+	x |= x >> 2;  // handle  4 bit numbers
+	x |= x >> 4;  // handle  8 bit numbers
+	#if (T.sizeof >= 2) x |= x >> 8;  // handle 16 bit numbers
+	#if (T.sizeof >= 4) x |= x >> 16; // handle 32 bit numbers
+	#if (T.sizeof >= 8) x |= x >> 32; // handle 64 bit numbers
+	++x;
+
+	return x;
 }
 
 void print(u8[] str) {
@@ -24,6 +110,25 @@ void print(u8[] str) {
 		cast(u32)str.length,
 		&numWritten,
 		null);
+}
+
+void println(u8[] str = null) {
+	print(str);
+	u8 endl = '\n';
+	print((&endl)[0..1]);
+}
+
+void printArray[T](T[] array)
+{
+	u64 len = array.length;
+	print("[");
+	for (u64 i = 0; i < len; ++i)
+	{
+		if (i > 0)
+			print(", ");
+		printInt(array[i]);
+	}
+	print("]");
 }
 
 void setRangeu8(u8[] slice, u8 value) {
@@ -79,12 +184,6 @@ u8[] formatInt(i64 i, u8[21]* output, u32 minSize)
 		}
 	}
 	return (*output)[21 - numDigits..21];
-}
-
-void println(u8[] str) {
-	print(str);
-	u8 endl = '\n';
-	print((&endl)[0..1]);
 }
 
 i64 cstrlen(u8* str) {
