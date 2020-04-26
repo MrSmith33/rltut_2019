@@ -58,7 +58,10 @@ void do_ai(GameMap* map, EntityId monsterId, EntityId targetId)
 		Fighter* target_fighter = &map.fighters[target.fighter];
 		if (map.distance_between(monsterId, targetId) > 1)
 		{
-			map.move_towards(monsterId, target.x, target.y);
+			if (targetId == map.playerId)
+				map.move_towards_player(monsterId);
+			else
+				map.move_towards(monsterId, target.x, target.y);
 		}
 		else if (target_fighter.hp > 0)
 		{

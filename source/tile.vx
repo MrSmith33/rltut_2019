@@ -7,16 +7,20 @@ enum TileFlags : u8 {
 	is_visible          = 1 << 2,
 	// true if player has seen the tile before
 	is_explored         = 1 << 3,
+	// visit flag
+	is_visited          = 1 << 4,
 }
 
 struct Tile
 {
-	u8 flags;
+	u8 flags; // set of TileFlags
 	u8 max_render_order;
 	EntityId blocking_entity;
+	u16 distance_to_player;
 	bool blocked() { return (flags & TileFlags.blocks_walk) != 0; }
 	bool block_sight() { return (flags & TileFlags.blocks_sight) != 0; }
 	bool visible() { return (flags & TileFlags.is_visible) != 0; }
 	bool explored() { return (flags & TileFlags.is_explored) != 0; }
+	bool visited() { return (flags & TileFlags.is_visited) != 0; }
 	bool has_blocking_entity() { return blocking_entity != EntityId.max; }
 }

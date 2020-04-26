@@ -44,6 +44,7 @@ struct GameMap
 	i32 viewport_h;
 	i32 view_radius;
 	Tile[map_width][map_height] tiles;
+	Array[Point] queue;
 	Entity[max_entities] entities;
 	EntityId num_entities;
 	Fighter[max_entities] fighters;
@@ -51,8 +52,11 @@ struct GameMap
 	Ai[max_entities] ais;
 	AiId num_ais;
 
+	bool show_dmap;
+
 	void init(i32 window_w, i32 window_h)
 	{
+		queue.extend(cast(u32)(map_width * map_height));
 		init_rand_state(&rand_state);
 		view_offset_x = 0;
 		view_offset_y = 0;
@@ -68,7 +72,7 @@ struct GameMap
 		add_fighter(eid, 30, 30, 2, 5);
 
 		initialize_tiles();
-		make_map(&entities[0]);
+		make_map(&entities[playerId]);
 
 		game_state = GameState.PLAYER_TURN;
 	}
@@ -323,37 +327,91 @@ struct GameMap
 
 	void move_towards(EntityId eid, i32 target_x, i32 target_y)
 	{
-		MoveData data = MoveData(this, eid, 0);
+		struct MoveData
+		{
+			GameMap* map;
+			EntityId eid;
+		}
+
+		bool move_visitor(void* _data, i32 x, i32 y)
+		{
+			MoveData data = *cast(MoveData*)_data;
+
+			if (!data.map.blocks_walk(x, y))
+			{
+				EntityId targetId = data.map.get_blocking_entities_at_location(x, y);
+				if (targetId == EntityId.max)
+				{
+					Entity* e = &data.map.entities[data.eid];
+					data.map.move_to(data.eid, x, y);
+				}
+			}
+			return true;
+		}
+
+		MoveData data = MoveData(this, eid);
 		Entity* e = &entities[eid];
 		tran_thong(e.x, e.y, target_x, target_y, &move_visitor, cast(void*)&data, LineVisitFlags.SKIP_START);
 	}
+
+	void move_towards_player(EntityId eid)
+	{
+		struct MinData
+		{
+			Point player_pos;
+			u16 dist; // distance to the best pos
+			u16 manhattan; // manhattan dist between best pos and player
+			Point p; // position to check
+		}
+
+		// chooses the best position to move into
+		void choosePos(GameMap* map, MinData* minData, Point pos)
+		{
+			Tile* t = &map.tiles[pos.y][pos.x];
+			if (t.blocked) return;
+
+			u16 dist = t.distance_to_player;
+			if (dist > minData.dist) return;
+
+			u16 pos_manhattan = cast(u16)manhattan(pos, minData.player_pos);
+			if (dist < minData.dist || pos_manhattan < minData.manhattan) {
+				minData.p = pos;
+				minData.dist = dist;
+				minData.manhattan = pos_manhattan;
+			}
+		}
+
+		Entity* e = &entities[eid];
+		Entity* player = &entities[playerId];
+		MinData minPoint = MinData(Point(player.x, player.y), u16.max);
+
+		Point p = Point(e.x, e.y);
+		choosePos(this, &minPoint, Point(p.x - 1, p.y - 1));
+		choosePos(this, &minPoint, Point(p.x    , p.y - 1));
+		choosePos(this, &minPoint, Point(p.x + 1, p.y - 1));
+		choosePos(this, &minPoint, Point(p.x - 1, p.y    ));
+		choosePos(this, &minPoint, Point(p.x + 1, p.y    ));
+		choosePos(this, &minPoint, Point(p.x - 1, p.y + 1));
+		choosePos(this, &minPoint, Point(p.x    , p.y + 1));
+		choosePos(this, &minPoint, Point(p.x + 1, p.y + 1));
+
+		if (minPoint.dist != u16.max)
+		{
+			move_to(eid, minPoint.p.x, minPoint.p.y);
+		}
+	}
 }
 
-struct MoveData
+u32 manhattan(Point a, Point b)
 {
-	GameMap* map;
-	EntityId eid;
+	u32 dx = cast(u32)abs(b.x - a.x);
+	u32 dy = cast(u32)abs(b.y - a.y);
+	return dx + dy;
 }
 
 struct Panel
 {
 
-}
-
-bool move_visitor(void* _data, i32 x, i32 y)
-{
-	MoveData data = *cast(MoveData*)_data;
-
-	if (!data.map.blocks_walk(x, y))
-	{
-		EntityId targetId = data.map.get_blocking_entities_at_location(x, y);
-		if (targetId == EntityId.max)
-		{
-			Entity* e = &data.map.entities[data.eid];
-			data.map.move_to(data.eid, x, y);
-		}
-	}
-	return true;
 }
 
 enum VIEW_RADIUS = 7;
@@ -406,6 +464,73 @@ void update_fov(GameMap* map, Entity* player)
 	}
 }
 
+void update_dijkstra_maps(GameMap* map, Entity* player)
+{
+	i64 start = curMsecs;
+
+	for (i32 y = 0; y < map.map_height; ++y)
+	{
+		for (i32 x = 0; x < map.map_width; ++x)
+		{
+			Tile* tile = &map.tiles[y][x];
+			tile.distance_to_player = u16.max;
+		}
+	}
+	i64 clearTime = curMsecs;
+
+	Tile* player_tile = &map.tiles[player.y][player.x];
+	player_tile.distance_to_player = 0;
+	map.queue.put(Point(player.x, player.y));
+
+	u32 maxLength;
+	u32 cursor;
+	while (map.queue.length > cursor)
+	{
+		void update_neighbor(GameMap* map, u16 ndistance, Point neighbor)
+		{
+			if (map.blocks_walk(neighbor.x, neighbor.y)) return;
+			// not needed, because there is a border around map
+			//if (neighbor.x < 0) return;
+			//if (neighbor.x >= map.map_width) return;
+			//if (neighbor.y < 0) return;
+			//if (neighbor.y >= map.map_height) return;
+
+			Tile* t = &map.tiles[neighbor.y][neighbor.x];
+			if (t.blocked) return;
+			if (t.distance_to_player <= ndistance) return;
+
+			t.distance_to_player = ndistance;
+			map.queue.put(neighbor);
+		}
+		maxLength = max[u32](maxLength, map.queue.length - cursor);
+
+		Point p = map.queue.bufPtr[cursor];
+		u16 neighbour_dist = map.tiles[p.y][p.x].distance_to_player + 1;
+		
+		update_neighbor(map, neighbour_dist, Point(p.x - 1, p.y - 1));
+		update_neighbor(map, neighbour_dist, Point(p.x    , p.y - 1));
+		update_neighbor(map, neighbour_dist, Point(p.x + 1, p.y - 1));
+		update_neighbor(map, neighbour_dist, Point(p.x - 1, p.y    ));
+		update_neighbor(map, neighbour_dist, Point(p.x + 1, p.y    ));
+		update_neighbor(map, neighbour_dist, Point(p.x - 1, p.y + 1));
+		update_neighbor(map, neighbour_dist, Point(p.x    , p.y + 1));
+		update_neighbor(map, neighbour_dist, Point(p.x + 1, p.y + 1));
+		++cursor;
+	}
+
+	map.queue.clear;
+	i64 end = curMsecs;
+	print("clear time ");
+	printInt(clearTime - start);
+	print(" map time ");
+	printInt(end - clearTime);
+	print(" iters ");
+	printInt(cursor);
+	print(" max len ");
+	printInt(maxLength);
+	println;
+}
+
 void render_int(Window* win, i64 i, i32 x, i32 y)
 {
 	u8[21] buf;
@@ -431,7 +556,7 @@ void render_string(Window* win, u8[] str, i32 x, i32 y)
 	}
 }
 
-void render_all(Window* win, GameMap* map)
+void render_all(Window* win, GameMap* map, Point mouse_pos)
 {
 	// Render tiles
 	for (i32 y = 0; y < map.map_height; ++y)
@@ -503,6 +628,41 @@ void render_all(Window* win, GameMap* map)
 	render_int(win, player_fighter.hp, 3, 0);
 	render_string(win, "/", 6, 0);
 	render_int(win, player_fighter.max_hp, 7, 0);
+
+	render_string(win, "X:", 0, 1);
+	render_int(win, mouse_pos.x, 2, 1);
+	render_string(win, "Y:", 6, 1);
+	render_int(win, mouse_pos.y, 8, 1);
+
+	if (map.show_dmap) render_dijkstra_map(win, map);
+}
+
+void render_dijkstra_map(Window* win, GameMap* map)
+{
+	for (i32 y = 0; y < map.map_height; ++y)
+	{
+		for (i32 x = 0; x < map.map_width; ++x)
+		{
+			Tile* tile_ptr = &map.tiles[y][x];
+			u16 dist = tile_ptr.distance_to_player;
+			u8 lowest_digit;
+			if (dist == u16.max)
+				lowest_digit = 'M';
+			else
+				lowest_digit = cast(u8)('0' + dist % 10);
+
+			i32 char_id = cast(i32)lowest_digit - 32;
+			i32 from_x = (char_id % 32) * TILE_SIZE;
+			i32 from_y = (char_id / 32) * TILE_SIZE;
+			SDL_Rect from = SDL_Rect(from_x, from_y, TILE_SIZE, TILE_SIZE);
+			SDL_Rect to = SDL_Rect(
+				x * scale * TILE_SIZE + map.view_offset_x,
+				y * scale * TILE_SIZE + map.view_offset_y,
+				TILE_SIZE * scale, TILE_SIZE * scale);
+
+			SDL_RenderCopy(win.sdl_renderer, win.font, &from, &to);
+		}
+	}
 }
 
 void render_bar(Window* win, i32 x, i32 y, i32 total_width, u8[] name, i32 value, i32 max_value, Color bar_color, Color back_color)
@@ -528,13 +688,6 @@ i32 main(void* hInstance, void* hPrevInstance, u8* lpCmdLine, i32 nShowCmd)
 	i32 panel_y = screen_height - PANEL_HEIGHT;
 
 	window_init(&win, screen_width, screen_height, "RL tutorial in Vox lang");
-
-	Array[i32] points;
-	points.put(42);
-	points.put(33);
-	printArray[i32](points.data);
-	println;
-
 
 	bool run = true;
 	SDL_Event e;
@@ -616,6 +769,9 @@ i32 main(void* hInstance, void* hPrevInstance, u8* lpCmdLine, i32 nShowCmd)
 						++map.view_radius;
 						recalc_fov = true;
 					}
+					SDL_Scancode.SDL_SCANCODE_F1 {
+						map.show_dmap = !map.show_dmap;
+					}
 					else {}
 				}
 			}
@@ -660,10 +816,11 @@ i32 main(void* hInstance, void* hPrevInstance, u8* lpCmdLine, i32 nShowCmd)
 
 		if (recalc_fov) {
 			update_fov(map, player);
+			update_dijkstra_maps(map, player);
 			map.update_view_offset(player.x, player.y);
 			recalc_fov = false;
 		}
-		render_all(&win, map);
+		render_all(&win, map, Point(cursor_map_x, cursor_map_y));
 		SDL_RenderPresent(win.sdl_renderer);
 		SDL_Delay(40);
 	}

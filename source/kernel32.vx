@@ -1,7 +1,7 @@
 void ExitProcess(u32 uExitCode);
 u64 GetTickCount64();
-bool QueryPerformanceCounter(i64* performanceCount);
-bool QueryPerformanceFrequency(i64* frequency);
+void QueryPerformanceCounter(i64* performanceCount);
+void QueryPerformanceFrequency(i64* frequency);
 
 u8 WriteConsoleA(
 	void* hConsoleOutput,
