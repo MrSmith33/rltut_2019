@@ -8,17 +8,17 @@ i64 curMsecs() {
 	return counter * 1000 / freq;
 }
 
-T min[T](T a, T b) {
+T min[T](T a, T b) #inline {
 	if (a < b) return a;
 	return b;
 }
 
-T max[T](T a, T b) {
+T max[T](T a, T b) #inline {
 	if (a > b) return a;
 	return b;
 }
 
-i32 abs(i32 a) {
+i32 abs(i32 a) #inline {
 	if (a < 0) return -a;
 	return a;
 }
@@ -135,7 +135,7 @@ T nextPOT[T](T x)
 	return x;
 }
 
-void print(u8[] str) {
+void printString(u8[] str) {
 	void* handle = GetStdHandle(STD_OUTPUT_HANDLE);
 	u32 numWritten;
 	WriteConsoleA(
@@ -146,10 +146,27 @@ void print(u8[] str) {
 		null);
 }
 
-void println(u8[] str = null) {
-	print(str);
-	u8 endl = '\n';
-	print((&endl)[0..1]);
+$alias selectPrintFunc($type T) {
+	if ($isInteger(T))
+		return printInt;
+	if ($isSlice(T))
+		return printString;
+	$compileError("Invalid type");
+}
+
+void print[Args...](Args... args) {
+	#foreach(i, arg; args) {
+		alias func = selectPrintFunc(Args[i]);
+		func(arg);
+	}
+}
+
+void println[Args...](Args... args) {
+	#foreach(i, arg; args) {
+		alias func = selectPrintFunc(Args[i]);
+		func(arg);
+	}
+	printString("\n");
 }
 
 void printArray[T](T[] array)
@@ -232,7 +249,7 @@ i64 cstrlen(u8* str) {
 }
 
 //
-u64 rotl(u64 x, u32 k) {
+u64 rotl(u64 x, u32 k) #inline {
 	return (x << k) | (x >> (64 - k));
 }
 

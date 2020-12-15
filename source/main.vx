@@ -82,7 +82,7 @@ struct GameMap
 		EntityId eid = num_entities++;
 		Entity* entity = &entities[eid];
 		*entity = Entity(x, y, 0, c, render_order, r, g, b, name);
-		// future: println("Add $eid $name at $x, $y;");
+		// future: println($"Add $eid $name at $x, $y;");
 		// future: println("Add {} {} at {}, {};", eid, name, x, y);
 		//print("Add ");
 		//printInt(eid);
@@ -464,7 +464,7 @@ void update_fov(GameMap* map, Entity* player)
 	}
 }
 
-void update_dijkstra_maps(GameMap* map, Entity* player)
+void update_distance_maps(GameMap* map, Entity* player)
 {
 	i64 start = curMsecs;
 
@@ -520,15 +520,11 @@ void update_dijkstra_maps(GameMap* map, Entity* player)
 
 	map.queue.clear;
 	i64 end = curMsecs;
-	print("clear time ");
-	printInt(clearTime - start);
-	print(" map time ");
-	printInt(end - clearTime);
-	print(" iters ");
-	printInt(cursor);
-	print(" max len ");
-	printInt(maxLength);
-	println;
+	println(
+		"clear time ", clearTime - start,
+		" map time ", end - clearTime,
+		" iters ", cursor,
+		" max len ", maxLength);
 }
 
 void render_int(Window* win, i64 i, i32 x, i32 y)
@@ -634,10 +630,10 @@ void render_all(Window* win, GameMap* map, Point mouse_pos)
 	render_string(win, "Y:", 6, 1);
 	render_int(win, mouse_pos.y, 8, 1);
 
-	if (map.show_dmap) render_dijkstra_map(win, map);
+	if (map.show_dmap) render_distance_map(win, map);
 }
 
-void render_dijkstra_map(Window* win, GameMap* map)
+void render_distance_map(Window* win, GameMap* map)
 {
 	for (i32 y = 0; y < map.map_height; ++y)
 	{
@@ -682,7 +678,7 @@ i32 main(void* hInstance, void* hPrevInstance, u8* lpCmdLine, i32 nShowCmd)
 {
 	Window win;
 	i32 screen_width = 1200;
-	i32 screen_height = 800;
+	i32 screen_height = 600;
 	enum BAR_WIDTH = 20;
 	enum PANEL_HEIGHT = 7;
 	i32 panel_y = screen_height - PANEL_HEIGHT;
@@ -741,7 +737,7 @@ i32 main(void* hInstance, void* hPrevInstance, u8* lpCmdLine, i32 nShowCmd)
 					doMove = true;
 				}
 
-				switch(scancode)
+				switch (scancode)
 				{
 					SDL_Scancode.SDL_SCANCODE_KP_1 { dx = -1; dy = 1; }
 					SDL_Scancode.SDL_SCANCODE_KP_2 { dy = -1; dy = 1; }
@@ -816,7 +812,7 @@ i32 main(void* hInstance, void* hPrevInstance, u8* lpCmdLine, i32 nShowCmd)
 
 		if (recalc_fov) {
 			update_fov(map, player);
-			update_dijkstra_maps(map, player);
+			update_distance_maps(map, player);
 			map.update_view_offset(player.x, player.y);
 			recalc_fov = false;
 		}

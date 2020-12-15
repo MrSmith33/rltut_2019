@@ -17,10 +17,10 @@ struct Tile
 	u8 max_render_order;
 	EntityId blocking_entity;
 	u16 distance_to_player;
-	bool blocked() { return (flags & TileFlags.blocks_walk) != 0; }
-	bool block_sight() { return (flags & TileFlags.blocks_sight) != 0; }
-	bool visible() { return (flags & TileFlags.is_visible) != 0; }
-	bool explored() { return (flags & TileFlags.is_explored) != 0; }
-	bool visited() { return (flags & TileFlags.is_visited) != 0; }
-	bool has_blocking_entity() { return blocking_entity != EntityId.max; }
+	bool blocked() #inline { return (flags & TileFlags.blocks_walk) != 0; }
+	bool block_sight() #inline { return (flags & TileFlags.blocks_sight) != 0; }
+	bool visible() #inline { return (flags & TileFlags.is_visible) != 0; }
+	bool explored() #inline { return (flags & TileFlags.is_explored) != 0; }
+	bool visited() #inline { return (flags & TileFlags.is_visited) != 0; }
+	bool has_blocking_entity() #inline { return blocking_entity != EntityId.max; }
 }

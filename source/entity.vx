@@ -27,7 +27,7 @@ struct Entity
 	FighterId fighter;
 	AiId ai;
 
-	bool blocks() { return flags & EntityFlags.blocks; }
+	bool blocks() #inline { return flags & EntityFlags.blocks; }
 }
 
 alias EntityId = u16;
