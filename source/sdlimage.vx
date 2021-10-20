@@ -1,3 +1,5 @@
+@extern(module, "sdl2_image"):
+
 import sdl;
 
 i32 IMG_Init(i32 flags);

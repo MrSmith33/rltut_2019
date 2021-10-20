@@ -1,4 +1,6 @@
-void ExitProcess(u32 uExitCode);
+@extern(module, "kernel32"):
+
+noreturn ExitProcess(u32 uExitCode);
 u64 GetTickCount64();
 void QueryPerformanceCounter(i64* performanceCount);
 void QueryPerformanceFrequency(i64* frequency);

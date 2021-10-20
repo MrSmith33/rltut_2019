@@ -674,7 +674,7 @@ enum GameState : u8 {
 	PLAYER_DEAD = 2,
 }
 
-i32 main(void* hInstance, void* hPrevInstance, u8* lpCmdLine, i32 nShowCmd)
+void main(void* hInstance, void* hPrevInstance, u8* lpCmdLine, i32 nShowCmd)
 {
 	Window win;
 	i32 screen_width = 1200;
@@ -823,5 +823,4 @@ i32 main(void* hInstance, void* hPrevInstance, u8* lpCmdLine, i32 nShowCmd)
 
 	window_destroy(&win);
 	ExitProcess(0);
-	return 0;
 }

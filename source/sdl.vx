@@ -1,3 +1,5 @@
+@extern(module, "sdl2"):
+
 struct SDL_Window;
 struct SDL_Renderer;
 struct SDL_Texture;
